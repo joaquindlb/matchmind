@@ -147,6 +147,54 @@
         .empty p { margin: 0; color: var(--muted); }
         #result { display: none; }
 
+        /* This week's matches */
+        .fixtures-card { margin-top: 24px; }
+        .fx-list {
+          display: grid; grid-auto-flow: column; grid-auto-columns: minmax(240px, 1fr);
+          gap: 10px; overflow-x: auto; padding-bottom: 6px; margin-top: 4px;
+        }
+        .fx {
+          text-align: left; border: 2px solid transparent; background: #fff; border-radius: 18px;
+          padding: 14px 16px; cursor: pointer; display: grid; gap: 8px;
+        }
+        .fx:hover { border-color: var(--line); }
+        .fx.active { border-color: var(--pitch); }
+        .fx-time { font-size: 12px; font-weight: 700; color: var(--muted); }
+        .fx-team { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 15px; }
+        .fx-team img { width: 22px; height: 22px; object-fit: contain; }
+        .fx-bar { display: flex; height: 8px; border-radius: 999px; overflow: hidden; background: var(--line); }
+        .fx-bar span:nth-child(1) { background: var(--pitch); }
+        .fx-bar span:nth-child(2) { background: var(--draw); }
+        .fx-bar span:nth-child(3) { background: var(--away); }
+        .fx-pcts { display: flex; justify-content: space-between; font-size: 12px; font-weight: 700; color: var(--muted); }
+        .fx-empty { color: var(--muted); margin: 4px 0 0; }
+
+        /* Accuracy / backtest card */
+        .accuracy { margin-top: 24px; }
+        .acc-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; }
+        .acc-head h2 { margin-bottom: 4px; }
+        .acc-sub { margin: 0; color: var(--muted); max-width: 60ch; }
+        .secondary {
+          border: 0; border-radius: 999px; padding: 12px 22px; background: var(--ink); color: #fff;
+          font-weight: 700; cursor: pointer; white-space: nowrap;
+        }
+        .secondary:disabled { opacity: .65; cursor: wait; }
+        .stats { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10px; margin-top: 20px; }
+        .stat { background: #fff; border-radius: 16px; padding: 16px; }
+        .stat b { display: block; font-size: 30px; font-weight: 800; line-height: 1.1; }
+        .stat span { font-size: 13px; color: var(--muted); }
+        .stat.main { background: var(--pitch); color: #fff; }
+        .stat.main span { color: #CFE6DA; }
+        .verdict { margin: 16px 0 0; font-weight: 700; }
+        .table-wrap { overflow-x: auto; margin-top: 16px; background: #fff; border-radius: 16px; }
+        table { width: 100%; border-collapse: collapse; font-size: 14px; }
+        th, td { padding: 11px 14px; text-align: left; white-space: nowrap; }
+        th { color: var(--muted); font-weight: 700; font-size: 12px; border-bottom: 1px solid var(--line); }
+        tr + tr td { border-top: 1px solid var(--line); }
+        .hit, .miss { display: inline-block; font-weight: 800; padding: 2px 10px; border-radius: 999px; font-size: 12px; }
+        .hit { background: #E3EFE8; color: var(--pitch-dark); }
+        .miss { background: #F6E3E1; color: var(--error); }
+
         @media (max-width: 1100px) {
           .content { grid-template-columns: 1fr; }
         }
@@ -165,6 +213,8 @@
           .crest { width: 40px; height: 40px; }
           .zone { font-size: 20px; }
           .alert { flex-direction: column; align-items: flex-start; }
+          .acc-head { flex-direction: column; }
+          .stats { grid-template-columns: 1fr 1fr; }
         }
         @media (prefers-reduced-motion: reduce) { .zone, .legend span { transition: none; } }
     </style>
@@ -202,6 +252,12 @@
         </div>
 
         <p id="message" class="message" role="status"></p>
+
+        <section class="card fixtures-card" id="fixtures">
+            <h2 id="fx-title">This week's matches</h2>
+            <div class="fx-list" id="fx-list"></div>
+            <p class="fx-empty" id="fx-empty"></p>
+        </section>
 
         <section id="empty" class="card empty" style="margin-top:28px">
             <h2>Pick a matchup</h2>
@@ -263,6 +319,32 @@
 
             <p class="footnote wide" id="footnote"></p>
         </section>
+
+        <section class="card accuracy" id="accuracy">
+            <div class="acc-head">
+                <div>
+                    <h2 id="acc-title">How accurate is MatchMind?</h2>
+                    <p class="acc-sub">Each past match of this season is predicted using only the games played before it, then compared with the real result.</p>
+                </div>
+                <button class="secondary" id="run-test">Test the model</button>
+            </div>
+            <p class="message" id="acc-message" role="status"></p>
+            <div id="acc-body" hidden>
+                <div class="stats">
+                    <div class="stat main"><b id="s-acc"></b><span id="s-acc-text"></span></div>
+                    <div class="stat"><b id="s-base"></b><span>Always picking the home team</span></div>
+                    <div class="stat"><b id="s-conf"></b><span id="s-conf-text"></span></div>
+                    <div class="stat"><b id="s-prob"></b><span>Average chance given to what really happened</span></div>
+                </div>
+                <p class="verdict" id="s-verdict"></p>
+                <div class="table-wrap">
+                    <table>
+                        <thead><tr><th>Date</th><th>Match</th><th>Score</th><th>MatchMind picked</th><th></th></tr></thead>
+                        <tbody id="acc-rows"></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
     </div>
 </div>
 
@@ -279,6 +361,7 @@
       ["BSA", "Brasileirão", "BR"]
     ];
     const $ = id => document.getElementById(id);
+    const escapeHtml = t => String(t).replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
     const crests = {};  // team id -> crest image URL, filled when a league's teams load
 
     // Shows a crest if we have one; hides the image if it is missing or fails to load
@@ -307,11 +390,15 @@
       $("competition").add(new Option(name, code));
     }
 
-    function selectLeague(code) {
+    async function selectLeague(code) {
       $("competition").value = code;
+      $("acc-title").textContent = "How accurate is MatchMind in " + leagueName(code) + "?";
+      $("acc-body").hidden = true;
+      $("acc-message").textContent = "";
       document.querySelectorAll(".league").forEach(b =>
         b.setAttribute("aria-current", b.dataset.code === code ? "true" : "false"));
-      loadTeams();
+      await loadTeams();   // teams first, so the fixture cards can show crests
+      loadFixtures(code);
     }
 
     function showMessage(text, isError = false) {
@@ -346,7 +433,51 @@
       }
     }
 
-    async function predict() {
+    // Upcoming matches with a mini forecast; clicking one opens the full prediction
+    async function loadFixtures(code) {
+      $("fx-title").textContent = "This week in " + leagueName(code);
+      $("fx-list").innerHTML = "";
+      $("fx-empty").textContent = "Loading upcoming matches…";
+      try {
+        const fixtures = await getJson("/api/competitions/" + code + "/upcoming");
+        if (code !== $("competition").value) return;   // league changed while loading
+        if (!fixtures.length) {
+          $("fx-empty").textContent = "No matches scheduled in the next 7 days, possibly an international break. You can still pick any two teams above.";
+          return;
+        }
+        $("fx-empty").textContent = "";
+        for (const f of fixtures) {
+          const btn = document.createElement("button");
+          btn.className = "fx";
+          btn.dataset.home = f.homeId;
+          btn.dataset.away = f.awayId;
+          const when = new Date(f.kickoff).toLocaleString("en-US", { weekday: "short", month: "short", day: "numeric", hour: "numeric", minute: "2-digit" });
+          const crestImg = id => crests[id] ? `<img src="${crests[id]}" alt="" onerror="this.remove()">` : "";
+          const hasForecast = f.homeWinPercent !== null;
+          btn.innerHTML = `
+            <span class="fx-time">${escapeHtml(when)}</span>
+            <span class="fx-team">${crestImg(f.homeId)}${escapeHtml(f.homeTeam)}</span>
+            <span class="fx-team">${crestImg(f.awayId)}${escapeHtml(f.awayTeam)}</span>
+            ${hasForecast ? `
+              <span class="fx-bar"><span style="width:${f.homeWinPercent}%"></span><span style="width:${f.drawPercent}%"></span><span style="width:${f.awayWinPercent}%"></span></span>
+              <span class="fx-pcts"><span>${Math.round(f.homeWinPercent)}%</span><span>${Math.round(f.drawPercent)}%</span><span>${Math.round(f.awayWinPercent)}%</span></span>` : ""}`;
+          btn.setAttribute("aria-label", `${f.homeTeam} vs ${f.awayTeam}, ${when}. Show full prediction`);
+          btn.addEventListener("click", () => openFixture(btn));
+          $("fx-list").appendChild(btn);
+        }
+      } catch (e) {
+        $("fx-empty").textContent = "Could not load upcoming matches. " + e.message;
+      }
+    }
+
+    function openFixture(btn) {
+      document.querySelectorAll(".fx").forEach(b => b.classList.toggle("active", b === btn));
+      $("home").value = btn.dataset.home;
+      $("away").value = btn.dataset.away;
+      predict(true);
+    }
+
+    async function predict(scrollToResult = false) {
       const home = $("home").value, away = $("away").value;
       if (!home || !away) return showMessage("Choose two teams first.", true);
       if (home === away) return showMessage("Choose two different teams.", true);
@@ -357,6 +488,7 @@
         const p = await getJson(`/api/predict?competition=${$("competition").value}&home=${home}&away=${away}`);
         render(p, home, away);
         showMessage("");
+        if (scrollToResult === true) $("title").scrollIntoView({ behavior: "smooth", block: "start" });
         loadAnalysis(home, away);
       } catch (e) {
         showMessage(e.message, true);
@@ -428,6 +560,48 @@
 
     $("competition").addEventListener("change", () => selectLeague($("competition").value));
     $("predict").addEventListener("click", predict);
+    $("run-test").addEventListener("click", runBacktest);
+
+
+    async function runBacktest() {
+      const code = $("competition").value;
+      $("run-test").disabled = true;
+      $("acc-message").className = "message";
+      $("acc-message").textContent = "Replaying the season…";
+      try {
+        const r = await getJson("/api/backtest?competition=" + code);
+        if (code !== $("competition").value) return;   // league changed while loading
+
+        $("s-acc").textContent = r.accuracyPercent + "%";
+        $("s-acc-text").textContent = `Correct result in ${r.correct} of ${r.matchesTested} matches`;
+        $("s-base").textContent = r.homeTeamBaselinePercent + "%";
+        $("s-conf").textContent = r.confidentTested ? r.confidentAccuracyPercent + "%" : "–";
+        $("s-conf-text").textContent = `When confident (55%+), ${r.confidentTested} matches`;
+        $("s-prob").textContent = r.avgProbabilityOfActualPercent + "%";
+
+        const diff = Math.round((r.accuracyPercent - r.homeTeamBaselinePercent) * 10) / 10;
+        $("s-verdict").textContent = diff > 0
+          ? `MatchMind beats the "always pick the home team" strategy by ${diff} points.`
+          : `So far MatchMind does not beat the "always pick the home team" strategy. Small samples early in the season are noisy.`;
+
+        $("acc-rows").innerHTML = r.recent.map(m => `
+          <tr>
+            <td>${escapeHtml(m.date)}</td>
+            <td>${escapeHtml(m.homeTeam)} vs ${escapeHtml(m.awayTeam)}</td>
+            <td><b>${escapeHtml(m.score)}</b></td>
+            <td>${escapeHtml(m.predicted)} (${m.predictedPercent}%)</td>
+            <td><span class="${m.correct ? "hit" : "miss"}">${m.correct ? "✓ Correct" : "✗ Missed"}</span></td>
+          </tr>`).join("");
+
+        $("acc-body").hidden = false;
+        $("acc-message").textContent = "Showing the 10 most recent tested matches.";
+      } catch (e) {
+        $("acc-message").className = "message error";
+        $("acc-message").textContent = e.message;
+      } finally {
+        $("run-test").disabled = false;
+      }
+    }
     selectLeague("PL");
 </script>
 </body>

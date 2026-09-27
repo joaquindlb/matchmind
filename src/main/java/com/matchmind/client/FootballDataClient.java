@@ -1,4 +1,3 @@
-
 package com.matchmind.client;
 
 import com.matchmind.client.FootballModels.*;
@@ -8,15 +7,19 @@ import org.springframework.web.client.RestClient;
 
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.function.Supplier;
 
 // Talks to the football-data.org API. Every other class uses this one,
 // so all the API details live in a single place.
 @Component
 public class FootballDataClient {
 
+    // The free tier allows 10 requests per minute, so match lists are cached for 10 minutes
     private static final Duration CACHE_TTL = Duration.ofMinutes(10);
 
     private final RestClient rest;
@@ -51,19 +54,38 @@ public class FootballDataClient {
         return response == null ? List.of() : response.matches();
     }
 
-    // Every finished match of the current season in a competition
+    // Every finished match of the current season in a competition (one request, cached)
     public List<Match> getFinishedCompetitionMatches(String competitionCode) {
-        CachedMatches cached = cache.get(competitionCode);
-        if (cached != null && cached.fetchedAt().isAfter(Instant.now().minus(CACHE_TTL))) {
-            return cached.matches();
+        return cached("finished:" + competitionCode, () -> {
+            MatchesResponse response = rest.get()
+                    .uri("/competitions/{code}/matches?status=FINISHED", competitionCode)
+                    .retrieve()
+                    .body(MatchesResponse.class);
+            return response == null ? List.of() : response.matches();
+        });
+    }
+
+    // Matches of a competition from today until daysAhead days from now (one request, cached)
+    public List<Match> getUpcomingMatches(String competitionCode, int daysAhead) {
+        return cached("upcoming:" + competitionCode, () -> {
+            LocalDate from = LocalDate.now(ZoneOffset.UTC);
+            LocalDate to = from.plusDays(daysAhead);
+            MatchesResponse response = rest.get()
+                    .uri("/competitions/{code}/matches?dateFrom={from}&dateTo={to}", competitionCode, from, to)
+                    .retrieve()
+                    .body(MatchesResponse.class);
+            return response == null ? List.of() : response.matches();
+        });
+    }
+
+    // Returns the cached list if it is fresh; otherwise calls the API and stores the result
+    private List<Match> cached(String key, Supplier<List<Match>> loader) {
+        CachedMatches entry = cache.get(key);
+        if (entry != null && entry.fetchedAt().isAfter(Instant.now().minus(CACHE_TTL))) {
+            return entry.matches();
         }
-        MatchesResponse response = rest.get()
-                .uri("/competitions/{code}/matches?status=FINISHED", competitionCode)
-                .retrieve()
-                .body(MatchesResponse.class);
-        List<Match> matches = response == null ? List.of() : response.matches();
-        cache.put(competitionCode, new CachedMatches(matches, Instant.now()));
+        List<Match> matches = loader.get();
+        cache.put(key, new CachedMatches(matches, Instant.now()));
         return matches;
     }
 }
-
