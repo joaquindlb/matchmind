@@ -6,17 +6,6 @@ import com.matchmind.prediction.PredictionModels.TeamForm;
 
 import java.util.*;
 
-/*
- * The Poisson model on its own, independent of where the matches come from.
- *
- * fit(matches) learns league averages and each team's attack/defense strength
- * from a list of finished matches. forecast(home, away) then returns the
- * probabilities for one match.
- *
- * Keeping it separate lets the same model be used for live predictions
- * (trained on the whole season) and for backtesting (trained only on the
- * matches played before the one being predicted).
- */
 public final class PoissonModel {
 
     private static final int MAX_GOALS = 7;

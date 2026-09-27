@@ -10,17 +10,6 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 
-/*
- * Backtesting: how good would MatchMind have been this season?
- *
- * For every finished match, the model is trained ONLY on matches that were
- * played before it, so it never "sees the answer". The predicted outcome
- * (the most likely of home win, draw or away win) is then compared with the
- * real result.
- *
- * As a reference, it also measures a naive strategy: always pick the home team.
- * A useful model should beat it.
- */
 @Service
 public class BacktestService {
 

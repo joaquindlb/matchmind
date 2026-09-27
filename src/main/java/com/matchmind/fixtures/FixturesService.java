@@ -45,7 +45,7 @@ public class FixturesService {
         try {
             model = PoissonModel.fit(client.getFinishedCompetitionMatches(competition));
         } catch (IllegalArgumentException e) {
-            // no data yet
+
         }
 
         final PoissonModel trained = model;

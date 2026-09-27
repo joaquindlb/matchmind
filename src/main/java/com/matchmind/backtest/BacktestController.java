@@ -16,7 +16,6 @@ public class BacktestController {
         this.backtestService = backtestService;
     }
 
-    // Example: /api/backtest?competition=PL
     @GetMapping("/backtest")
     public BacktestResult backtest(@RequestParam(defaultValue = "PL") String competition) {
         return backtestService.run(competition);

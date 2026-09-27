@@ -54,7 +54,7 @@ public class FootballDataClient {
         return response == null ? List.of() : response.matches();
     }
 
-    // Every finished match of the current season in a competition (one request, cached)
+    // Every finished match of the current season in a competition
     public List<Match> getFinishedCompetitionMatches(String competitionCode) {
         return cached("finished:" + competitionCode, () -> {
             MatchesResponse response = rest.get()

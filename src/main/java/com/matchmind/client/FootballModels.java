@@ -2,7 +2,6 @@ package com.matchmind.client;
 
 import java.util.List;
 
-// Java records that mirror the parts of the football-data.org JSON we need.
 public final class FootballModels {
 
     private FootballModels() {}
